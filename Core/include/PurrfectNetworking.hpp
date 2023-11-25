@@ -1,13 +1,16 @@
 #pragma once
 
-#ifndef PURRNET_NS
-// PURRNET (PurrfectNetworking) _NS (_NameSpace)
-#define PURRNET_NS PurrfectNetworking
-#endif
+#include "Core.hpp"
+
+// Include files for all platforms.
+// Currenly supporting Windows only
+#include "Windows.hpp"
 
 namespace PURRNET_NS {
 
 	class Server {
+
+
 
 	};
 

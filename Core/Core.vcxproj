@@ -70,7 +70,9 @@
   <ItemDefinitionGroup>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\Core.hpp" />
     <ClInclude Include="include\PurrfectNetworking.hpp" />
+    <ClInclude Include="include\Windows.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

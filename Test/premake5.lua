@@ -13,7 +13,6 @@ project "Test"
 
         includedirs {
             "$(SolutionDir)Core/include/",
-            "$(SolutionDir)/Libraries/asio/include/"
         }
 
         libdirs {}

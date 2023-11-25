@@ -12,7 +12,6 @@ project "Core"
 
         includedirs {
             "include/",
-            "$(SolutionDir)/Libraries/asio/include"
         }
 
         libdirs {}
