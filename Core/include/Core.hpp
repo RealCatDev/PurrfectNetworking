@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <thread>
 
 #ifndef PURRNET_NS
 // PURRNET (PurrfectNetworking) _NS (_NameSpace)
@@ -56,10 +57,14 @@ const char* PURRNET_FMT(const char* fmt, ...) {
 namespace PURRNET_NS {
 
 	struct RecieveData {
-		char Data[PURRNET_MAXBUF] = "";
+		char buffer[PURRNET_MAXBUF] = "";
+		size_t size = 0;
 	};
 
 	static bool Initialize();
+
+	// Used to convert hostname to ip
+	static std::string hostname(std::string hostname); 
 
 	class Socket {
 
@@ -67,7 +72,7 @@ namespace PURRNET_NS {
 
 #ifdef PURRNET_USE_PC
 		inline Socket(int port) 
-			: m_Port(port) {
+		{
 		}
 #else
 		inline Socket()
@@ -82,6 +87,7 @@ namespace PURRNET_NS {
 		}
 
 		virtual void Listen() = 0;
+		virtual Socket *AcceptSocket() = 0;
 		
 		virtual void Connect(std::string ip, int port) = 0;
 
@@ -89,8 +95,6 @@ namespace PURRNET_NS {
 		virtual RecieveData Recieve() = 0;
 
 	private:
-
-		int m_Port = 0;
 
 	};
 

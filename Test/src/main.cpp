@@ -1,38 +1,61 @@
+#define PURRNET_USE_DP
+#define PURRNET_DP 6969
 #define PURRNET_MAXBUF 4096
 #include <PurrfectNetworking.hpp>
 
-#include <sstream>
+class ExampleServer : public PURRNET_NS::Server {
+
+public:
+
+    ExampleServer() 
+        : PURRNET_NS::Server() {
+    }
+
+    ~ExampleServer() {
+
+    }
+
+private:
+
+    virtual void ClientThread(PURRNET_NS::Socket *sock) override {
+        char buf[PURRNET_MAXBUF];
+        int bytesRead = 0;
+        while (m_Running) {
+            try {
+                auto data = sock->Recieve();
+                if (data.size > 0 && std::string(data.buffer) != "disconnect") continue;
+                PURRNET_LOG_INF("Client disconnected!");
+                delete sock;
+                return;
+            } catch (std::exception ex) {
+                PURRNET_LOG_ERR(ex.what());
+                m_Running = false;
+            }
+        }
+    }
+
+};
 
 int main(int argc, char** argv) {
     if (!PurrfectNetworking::Initialize()) return 1;
 
-    PurrfectNetworking::WinSocket* sock = nullptr;
+    ExampleServer* server = nullptr;
+    std::string input = "";
 
     try {
-        sock = new PurrfectNetworking::WinSocket();
-
-        std::string host = "127.0.0.1";
-        sock->Connect(host, 3000);
-
-        std::string path = "/";
-
-        std::ostringstream requestStream;
-        requestStream << "GET " << path << " HTTP/1.1\r\n";
-        requestStream << "Host: " << host << "\r\n";
-        requestStream << "Connection: close\r\n\r\n";
-
-        sock->Send((char*) requestStream.str().c_str());
-        auto data = sock->Recieve();
-
-        std::cout << data.Data << std::endl;
-
+        server = new ExampleServer();
+        server->Run();
+        while (server->Running()) {
+            std::getline(std::cin, input);
+            if (input == "!quit") server->Stop();
+        }
     } catch (std::exception ex) {
         PURRNET_LOG_ERR(ex.what());
         goto cleanup;
     }
 
 cleanup:
-    if (sock) delete sock;
+    if (server) delete server;
 
     PurrfectNetworking::Shutdown();
 

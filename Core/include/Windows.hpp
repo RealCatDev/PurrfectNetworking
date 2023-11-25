@@ -17,6 +17,8 @@
 
 namespace PURRNET_NS {
 
+#define SOCKET_CLASS WinSocket
+
 	inline std::wstring StringToWideString(const std::string& narrowStr) {
 		int bufferSize = MultiByteToWideChar(CP_UTF8, 0, narrowStr.c_str(), -1, nullptr, 0);
 		if (bufferSize == 0) return L"";
@@ -44,12 +46,35 @@ namespace PURRNET_NS {
 		PURRNET_LOG_INF("PurrfectNetworking Shuted down!");
 	}
 
-	class WinSocket : public Socket {
+	inline static std::string hostname(std::string hostname) {
+
+	}
+
+	class WinSocket : public PURRNET_NS::Socket {
 
 	public:
 
-#ifdef PURRNET_USE_PC
-		inline WinSocket(int port)
+#if defined(PURRNET_USE_PC)
+#if defined(PURRNET_USE_DP)
+		inline WinSocket(std::string ip = "127.0.0.1")
+			: Socket(PURRNET_DP) {
+			m_Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+			if (m_Socket == INVALID_SOCKET) {
+				// TODO: Create new kind of error: SocketErr
+				throw std::runtime_error(PURRNET_FMT("Failed to create Socket, error: %d!", WSAGetLastError()));
+			}
+
+			sockaddr_in addr{};
+			addr.sin_family = AF_INET;
+			addr.sin_port = htons(port);
+			IInetPtonW(AF_INET, StringToWideString(ip.data()).data(), &addr.sin_addr.s_addr);
+
+			if (bind(m_Socket, (const sockaddr*)&addr, sizeof(addr)) != 0) {
+				throw std::runtime_error(PURRNET_FMT("Failed to bind Socket, error: %d!", WSAGetLastError()));
+			}
+	}
+#else
+		inline WinSocket(int port, std::string ip = "127.0.0.1")
 			: Socket(port) {
 			m_Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 			if (m_Socket == INVALID_SOCKET) {
@@ -60,15 +85,16 @@ namespace PURRNET_NS {
 			sockaddr_in addr{};
 			addr.sin_family = AF_INET;
 			addr.sin_port = htons(port);
-			InetPton(AF_INET, _T("127.0.0.1"), &addr.sin_addr.s_addr);
+			InetPtonW(AF_INET, StringToWideString(ip.data()).data(), &addr.sin_addr.s_addr);
 
 			if (bind(m_Socket, (const sockaddr*)&addr, sizeof(addr)) != 0) {
 				throw std::runtime_error(PURRNET_FMT("Failed to bind Socket, error: %d!", WSAGetLastError()));
 			}
 		}
+#endif
 #else
 		inline WinSocket()
-		{
+			: Socket() {
 			m_Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 			if (m_Socket == INVALID_SOCKET) {
 				// TODO: Create new kind of error: SocketErr
@@ -88,6 +114,11 @@ namespace PURRNET_NS {
 		}
 #endif
 
+		inline WinSocket(SOCKET sock)
+			: Socket(), m_Socket(sock) {
+			
+		}
+
 		inline ~WinSocket() {
 			closesocket(m_Socket);
 		}
@@ -95,14 +126,19 @@ namespace PURRNET_NS {
 		inline virtual void Listen() override {
 			if (listen(m_Socket, 1) != 0) {
 				throw std::runtime_error(PURRNET_FMT("Failed to listen, error: %d!", WSAGetLastError()));
-			} else {
+			}
+			else {
 				PURRNET_LOG_INF("Listening...");
 			}
+		}
 
-			m_AcceptSocket = accept(m_Socket, NULL, NULL);
-			if (m_AcceptSocket == INVALID_SOCKET) {
+		inline virtual Socket* AcceptSocket() override {
+			SOCKET sock = accept(m_Socket, NULL, NULL);
+			if (sock == INVALID_SOCKET) {
 				throw std::runtime_error(PURRNET_FMT("Failed to accept, error: %d!", WSAGetLastError()));
 			}
+
+			return new WinSocket(sock);
 		}
 
 		inline virtual void Connect(std::string ip, int port) override {
@@ -118,28 +154,23 @@ namespace PURRNET_NS {
 
 		inline virtual void Send(char* data) override {
 			int byteCount = SOCKET_ERROR;
-			if ((byteCount = send(m_Socket, data, PURRNET_MAXBUF, 0)) == SOCKET_ERROR) {
+			if ((byteCount = send(m_Socket, data, PURRNET_MAXBUF, 0)) == SOCKET_ERROR)
 				throw std::runtime_error(PURRNET_FMT("Failed to send data, error: %d!", WSAGetLastError()));
-			} else {
+			else
 				PURRNET_LOG_INF(PURRNET_FMT("Sent %ld bytes.", byteCount));
-			}
 		}
 
 		inline virtual RecieveData Recieve() override {
 			RecieveData data{};
 			int bytes = 0;
-			if ((bytes = recv(m_AcceptSocket == INVALID_SOCKET ? m_Socket : m_AcceptSocket, data.Data, PURRNET_MAXBUF, 0)) == SOCKET_ERROR)
+			if ((bytes = recv(m_Socket, data.buffer, PURRNET_MAXBUF, 0)) == SOCKET_ERROR)
 				throw std::runtime_error(PURRNET_FMT("Failed to recieve data, error: %d!", WSAGetLastError()));
-			else
-				PURRNET_LOG_INF(PURRNET_FMT("Recieved %ld bytes.", bytes));
-
-			return data;
+			return (data.size = bytes, data);
 		}
 
 	private:
 
 		SOCKET m_Socket = INVALID_SOCKET;
-		SOCKET m_AcceptSocket = INVALID_SOCKET; // Only use when socket is server
 
 	};
 
