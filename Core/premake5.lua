@@ -7,12 +7,11 @@ project "Core"
         objdir ("$(SolutionDir)/bin-int/%{cfg.system}-$(Configuration)/$(TargetDir)")
 
         files { 
-            "src/**.cpp", 
-            "src/**.h", 
+            "include/**.hpp", 
         }
 
         includedirs {
-            "src/",
+            "include/",
             "$(SolutionDir)/Libraries/asio/include"
         }
 
