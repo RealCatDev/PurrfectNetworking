@@ -27,7 +27,7 @@ public:
 private:
 
     virtual void ClientThread(PURRNET_NS::Socket *sock) override {
-        char buf[PURRNET_MAXBUF];
+        char buf[PURRNET_MAXBUF] = {0};
         int bytesRead = 0;
         int id = m_IdCounter++;
 
@@ -54,11 +54,8 @@ private:
         while (m_Running) {
             try {
                 auto data = sock->Recieve();
-                if (data.size <= 0 && std::string(data.buffer) == "disconnect") {
-                    PURRNET_LOG_INF(PURRNET_FMT("Client disconnected! ID: %llu.", id));
-                    m_Users.erase(id);
-                    delete sock;
-                    return;
+                if (data.size <= 0 && std::string(data.buffer) == "!disconnect") {
+                    break;
                 } else {
                     std::ostringstream message{};
                     message << m_Users[id].name;
@@ -67,11 +64,17 @@ private:
                     PURRNET_LOG_INF(message.str());
                     MessageAll(message.str());
                 }
+            } catch (PURRNET_NS::ClientDisconnectedException ex) {
+                break;
             } catch (std::exception ex) {
                 PURRNET_LOG_ERR(ex.what());
                 m_Running = false;
             }
         }
+
+        PURRNET_LOG_INF(PURRNET_FMT("Client disconnected! ID: %llu.", id));
+        m_Users.erase(id);
+        delete sock;
     }
 
     uint32_t m_IdCounter = 1;
@@ -95,7 +98,6 @@ int main(int argc, char** argv) {
         }
     }
 
-cleanup:
     if (server) delete server;
 
     PurrfectNetworking::Shutdown();

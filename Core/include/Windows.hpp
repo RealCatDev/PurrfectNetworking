@@ -199,7 +199,7 @@ namespace PURRNET_NS {
 		inline virtual void Send(char* data) override {
 			if (m_Socket == INVALID_SOCKET) throw std::runtime_error("Invalid socket!");
 			int byteCount = SOCKET_ERROR;
-			int dataSize = sizeof(data) + 1;
+			int dataSize = static_cast<int>(strlen(data) + 1);
 			if ((byteCount = send(m_Socket, data, dataSize, 0)) == SOCKET_ERROR)
 				throw PURRNET_NS::ClientDisconnectedException();
 #ifdef PURRNET_LALL
