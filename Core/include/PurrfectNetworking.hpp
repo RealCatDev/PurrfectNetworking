@@ -8,6 +8,105 @@
 
 namespace PURRNET_NS {
 
+	class Client {
+
+	public:
+
+#ifndef PURRNET_USE_DP
+		inline Client(int port)
+#ifdef PURRNET_USE_PC
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS(port, std::string("127.0.0.1"), false))
+#else
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS(std::string("127.0.0.1"), false))
+#endif
+		{
+#ifndef PURRNET_USE_PC
+			m_Socket->Connect("127.0.0.1", port);
+#endif
+		}
+
+		inline Client(std::string ip, int port)
+#ifdef PURRNET_USE_PC
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS(port))
+#else
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS())
+#endif
+		{
+#ifndef PURRNET_USE_PC
+			m_Socket->Connect(ip, port);
+#endif
+		}
+#else
+		inline Client()
+#ifdef PURRNET_USE_PC
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS(PURRNET_DP))
+#else
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS())
+#endif
+		{
+#ifndef PURRNET_USE_PC
+			m_Socket->Connect("127.0.0.1", PURRNET_DP);
+#endif
+		}
+
+		inline Client(std::string ip, int port)
+#ifdef PURRNET_USE_PC
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS(port))
+#else
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS())
+#endif
+		{
+#ifndef PURRNET_USE_PC
+			m_Socket->Connect(ip, port);
+#endif
+		}
+#endif
+
+		inline Client(PURRNET_NS::Socket* socket)
+			: m_Socket(socket) {
+		}
+
+		inline ~Client() {
+			delete m_Socket;
+		}
+
+		inline virtual void Run() {
+
+		}
+
+		inline bool Running() { return m_Running; }
+
+		inline void Send(std::string msg) {
+			m_Socket->Send(msg.data());
+		}
+
+		template <typename T>
+		inline void Send(T* msg) {
+			m_Socket->Send((char*)msg);
+		}
+
+		inline std::string Read() {
+			auto data = m_Socket->Recieve();
+
+			return std::string(data.buffer, data.size);
+		}
+
+		template <typename T>
+		inline T* Read() {
+			auto data = m_Socket->Recieve();
+
+			return (T*)data;
+		}
+
+		inline void Stop() { m_Running = false; }
+
+	protected:
+
+		bool m_Running = true;
+		Socket* m_Socket = nullptr;
+
+	};
+
 	class Server {
 
 	public:
@@ -15,9 +114,9 @@ namespace PURRNET_NS {
 #ifndef PURRNET_USE_DP
 		inline Server(int port)
 #ifdef PURRNET_USE_PC
-			: m_Socket(port)
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS(port))
 #else
-			: m_Socket()
+			: m_Socket(new PURRNET_NS::SOCKET_CLASS())
 #endif
 		{
 #ifndef PURRNET_USE_PC
@@ -74,10 +173,16 @@ namespace PURRNET_NS {
 		inline void Stop() { 
 			m_Running = false;
 			if (m_ListenThread.joinable()) m_ListenThread.join();
-			for (auto &thread : m_Threads) if (thread.joinable()) thread.join();
+			for (auto &pair : m_Clients) if (pair.second.joinable()) pair.second.join();
 		}
 
 		inline bool Running() { return m_Running; }
+
+		inline void MessageAll(std::string message) {
+			for (const auto &pair : m_Clients) {
+				pair.first->Send(message.data());
+			}
+		}
 
 	protected:
 
@@ -88,7 +193,8 @@ namespace PURRNET_NS {
 		inline void ListenerThread() {
 			while (m_Running) {
 				try {
-					m_Threads.emplace_back(&PURRNET_NS::Server::ClientThread, this, m_Socket->AcceptSocket());
+					auto socket = m_Socket->AcceptSocket();
+					m_Clients[socket] = std::thread(&PURRNET_NS::Server::ClientThread, this, socket);
 				} catch (std::exception ex) {
 					PURRNET_LOG_ERR(ex.what());
 					m_Running = false;
@@ -96,61 +202,11 @@ namespace PURRNET_NS {
 			}
 		}
 
-		virtual void ClientThread(PURRNET_NS::Socket *sock) = 0;
+		virtual void ClientThread(PURRNET_NS::Socket *socket) = 0;
 
 		std::thread m_ListenThread{};
-		std::vector<std::thread> m_Threads{};
+		std::unordered_map<PURRNET_NS::Socket *, std::thread> m_Clients{};
 		Socket *m_Socket = nullptr;
-
-	};
-
-	class Client {
-
-	public:
-
-#ifndef PURRNET_USE_DP
-		inline Client(std::string ip, int port)
-#ifdef PURRNET_USE_PC
-			: m_Socket(port, ip)
-#else
-			: m_Socket()
-#endif
-		{
-#ifndef PURRNET_USE_PC
-			m_Socket->Bind(ip, port);
-#endif
-		}
-#endif
-
-		inline ~Client() {
-			delete m_Socket;
-		}
-
-		inline void Send(std::string msg) {
-			m_Socket->Send((char*)msg.data());
-		}
-
-		template <typename T>
-		inline void Send(T *msg) {
-			m_Socket->Send((char*)msg);
-		}
-
-		inline std::string Read() {
-			auto data = m_Socket->Recieve();
-
-			return std::string(data.buffer, data.size);
-		}
-
-		template <typename T>
-		inline T *Read() {
-			auto data = m_Socket->Recieve();
-
-			return (T*)data;
-		}
-
-	private:
-
-		Socket* m_Socket = nullptr;
 
 	};
 

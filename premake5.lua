@@ -9,6 +9,4 @@ group "Core"
     include "Core"
 group ""
 
-group "Applications"
-    include "Test"
-group ""
+include "Examples"

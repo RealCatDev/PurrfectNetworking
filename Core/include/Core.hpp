@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #ifndef PURRNET_NS
 // PURRNET (PurrfectNetworking) _NS (_NameSpace)
@@ -55,6 +56,22 @@ const char* PURRNET_FMT(const char* fmt, ...) {
 #endif
 
 namespace PURRNET_NS {
+
+	class ClientDisconnectedException : public std::exception {
+
+	public:
+
+		inline ClientDisconnectedException()
+		{
+		}
+
+		inline ~ClientDisconnectedException() {
+
+		}
+
+	private:
+
+	};
 
 	struct RecieveData {
 		char buffer[PURRNET_MAXBUF] = "";
