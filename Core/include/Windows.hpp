@@ -165,7 +165,7 @@ namespace PURRNET_NS {
 		}
 
 		inline ~WinSocket() {
-			closesocket(m_Socket);
+			if (m_Socket != INVALID_SOCKET) closesocket(m_Socket);
 		}
 
 		inline virtual void Listen() override {

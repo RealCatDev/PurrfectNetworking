@@ -68,6 +68,7 @@ private:
                 break;
             } catch (std::exception ex) {
                 PURRNET_LOG_ERR(ex.what());
+                break;
                 m_Running = false;
             }
         }

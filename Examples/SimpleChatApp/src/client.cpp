@@ -27,14 +27,15 @@ public:
             m_Socket->Send(input.data());
             system("cls");
             std::cout << "Welcome to SimpleChatApp v0.1 example." << std::endl;
+            std::cout << "\ttype \"!disconnect\" to disconnect" << std::endl;
             std::cout << "\tby: RealCatDev" << std::endl << std::endl << std::endl << std::endl;
         }
         
         while (m_Running) {
             std::string input = "";
             std::getline(std::cin, input);
-            if (input == "!quit") Stop();
-            else m_Socket->Send(input.data());
+            m_Socket->Send(input.data());
+            if (input == "!disconnect") m_Running = false;
         }
 
         if (m_ReadThread.joinable()) m_ReadThread.join();
@@ -66,13 +67,10 @@ int main(int argc, char** argv) {
     try {
         client = new ExampleClient();
         client->Run();
-        while(client->Running()) {}
     } catch (std::exception ex) {
         PURRNET_LOG_ERR(ex.what());
-        goto cleanup;
     }
 
-cleanup:
     if (client) delete client;
 
     PurrfectNetworking::Shutdown();
