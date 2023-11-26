@@ -54,7 +54,7 @@ private:
         while (m_Running) {
             try {
                 auto data = sock->Recieve();
-                if (data.size <= 0 && std::string(data.buffer) == "!disconnect") {
+                if (data.size <= 0 || strcmp(data.buffer, "!disconnect") == 0) {
                     break;
                 } else {
                     std::ostringstream message{};
@@ -62,7 +62,7 @@ private:
                     message << ": ";
                     message << std::string(data.buffer);
                     PURRNET_LOG_INF(message.str());
-                    MessageAll(message.str());
+                    MessageAll(message.str(), sock);
                 }
             } catch (PURRNET_NS::ClientDisconnectedException ex) {
                 break;

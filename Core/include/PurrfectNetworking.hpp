@@ -179,8 +179,14 @@ namespace PURRNET_NS {
 		inline bool Running() { return m_Running; }
 
 		inline void MessageAll(std::string message) {
-			for (const auto &pair : m_Clients) {
+			for (const auto& pair : m_Clients) {
 				pair.first->Send(message.data());
+			}
+		}
+
+		inline void MessageAll(std::string message, PURRNET_NS::Socket *socket) {
+			for (const auto& pair : m_Clients) {
+				if (pair.first != socket) pair.first->Send(message.data());
 			}
 		}
 
