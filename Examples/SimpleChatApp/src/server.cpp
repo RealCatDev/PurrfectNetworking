@@ -49,6 +49,11 @@ private:
             user.name = data.buffer;
             user.socket = sock;
             m_Users[id] = user;
+
+            std::ostringstream message{};
+            message << m_Users[id].name;
+            message << " joined!";
+            MessageAll(message.str(), sock);
         }
 
         while (m_Running) {
@@ -74,6 +79,12 @@ private:
         }
 
         PURRNET_LOG_INF(PURRNET_FMT("Client disconnected! ID: %llu.", id));
+
+        std::ostringstream message{};
+        message << m_Users[id].name;
+        message << " has disconnected!";
+        MessageAll(message.str(), sock);
+
         m_Users.erase(id);
         DeleteClient(sock);
     }
