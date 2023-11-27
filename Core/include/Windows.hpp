@@ -46,45 +46,27 @@ namespace PURRNET_NS {
 		PURRNET_LOG_INF("PurrfectNetworking Shuted down!");
 	}
 
-	inline static std::string hostname(std::string hostname) {
-		struct addrinfo* result = nullptr;
-		struct addrinfo hints;
-
+	inline static std::string hostname(const char* hostname) {
+		addrinfo hints;
 		ZeroMemory(&hints, sizeof(hints));
-		hints.ai_family = AF_UNSPEC; // Allow IPv4 or IPv6
+		hints.ai_family = AF_INET;      // Use IPv4
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = IPPROTO_TCP;
 
-		int iResult = getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
-		if (iResult != 0) {
-			PURRNET_LOG_ERR(PURRNET_FMT("getaddrinfo failed, error: %d!", gai_strerror(iResult)));
-			return "";
-		}
+		addrinfo* result = nullptr;
+		if (getaddrinfo(hostname, nullptr, &hints, &result) != 0) return {};
 
-		std::string ipAddress;
-
-		if (result != nullptr) {
-			char ipString[INET6_ADDRSTRLEN];
-			void* addr;
-
-			if (result->ai_family == AF_INET) {
-				// IPv4
-				struct sockaddr_in* ipv4 = (struct sockaddr_in*)result->ai_addr;
-				addr = &(ipv4->sin_addr);
-			} else {
-				// IPv6
-				struct sockaddr_in6* ipv6 = (struct sockaddr_in6*)result->ai_addr;
-				addr = &(ipv6->sin6_addr);
+		char ip[INET_ADDRSTRLEN] = {0};
+		for (addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
+			if (ptr->ai_family == AF_INET) {
+				sockaddr_in* ipv4 = reinterpret_cast<sockaddr_in*>(ptr->ai_addr);
+				inet_ntop(AF_INET, &(ipv4->sin_addr), ip, INET_ADDRSTRLEN);
+				PURRNET_LOG_INF(PURRNET_FMT("%s", ip));
 			}
-
-			// Convert the IP address to a string
-			inet_ntop(result->ai_family, addr, ipString, sizeof(ipString));
-			ipAddress = ipString;
 		}
 
 		freeaddrinfo(result);
-
-		return ipAddress;
+		return ip;
 	}
 
 	class WinSocket : public PURRNET_NS::Socket {

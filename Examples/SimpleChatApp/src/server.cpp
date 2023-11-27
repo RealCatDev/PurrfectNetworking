@@ -45,6 +45,7 @@ private:
                 PURRNET_LOG_ERR(ex.what());
                 Stop();
             }
+            if (sock == nullptr) goto disconnect;
             User user{};
             user.name = data.buffer;
             user.socket = sock;
@@ -56,7 +57,7 @@ private:
             MessageAll(message.str(), sock);
         }
 
-        while (m_Running) {
+        while (m_Running && sock != nullptr) {
             try {
                 auto data = sock->Recieve();
                 if (data.size <= 0 || strcmp(data.buffer, "!disconnect") == 0) {
@@ -78,6 +79,7 @@ private:
             }
         }
 
+    disconnect:
         PURRNET_LOG_INF(PURRNET_FMT("Client disconnected! ID: %llu.", id));
 
         std::ostringstream message{};
