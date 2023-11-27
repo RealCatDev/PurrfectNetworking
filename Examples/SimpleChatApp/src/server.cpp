@@ -75,7 +75,7 @@ private:
 
         PURRNET_LOG_INF(PURRNET_FMT("Client disconnected! ID: %llu.", id));
         m_Users.erase(id);
-        delete sock;
+        DeleteClient(sock);
     }
 
     uint32_t m_IdCounter = 1;

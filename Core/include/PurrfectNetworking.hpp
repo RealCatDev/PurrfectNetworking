@@ -167,6 +167,7 @@ namespace PURRNET_NS {
 
 		inline void Run() {
 			m_Socket->Listen();
+			m_DeletionThread = std::thread(&Server::DeletionThread, this);
 			m_ListenThread = std::thread(&Server::ListenerThread, this);
 		}
 
@@ -194,6 +195,10 @@ namespace PURRNET_NS {
 
 		bool m_Running = true;
 
+		inline void DeleteClient(PURRNET_NS::Socket *socket) {
+			m_SocketToDelete = socket;
+		}
+
 	private:
 
 		inline void ListenerThread() {
@@ -208,10 +213,22 @@ namespace PURRNET_NS {
 			}
 		}
 
+		inline void DeletionThread() {
+			while (1) {
+				if (m_SocketToDelete != nullptr) {
+					if (m_Clients[m_SocketToDelete].joinable()) m_Clients[m_SocketToDelete].join();
+					m_Clients.erase(m_SocketToDelete);
+					m_SocketToDelete = nullptr;
+				}
+			}
+		}
+
 		virtual void ClientThread(PURRNET_NS::Socket *socket) = 0;
 
 		std::thread m_ListenThread{};
+		std::thread m_DeletionThread{};
 		std::unordered_map<PURRNET_NS::Socket *, std::thread> m_Clients{};
+		Socket *m_SocketToDelete = nullptr;
 		Socket *m_Socket = nullptr;
 
 	};

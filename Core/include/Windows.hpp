@@ -183,7 +183,8 @@ namespace PURRNET_NS {
 				throw std::runtime_error(PURRNET_FMT("Failed to accept, error: %d!", WSAGetLastError()));
 			}
 
-			return new WinSocket(sock);
+			auto socket = new WinSocket(sock);
+			return socket;
 		}
 
 		inline virtual void Connect(std::string ip, int port) override {
