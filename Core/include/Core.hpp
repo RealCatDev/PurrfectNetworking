@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <thread>
+#include <mutex>
 #include <unordered_map>
 
 #ifndef PURRNET_NS

@@ -168,6 +168,7 @@ namespace PURRNET_NS {
 		inline void Run() {
 			m_Socket->Listen();
 			m_DeletionThread = std::thread(&Server::DeletionThread, this);
+			m_DeletionThread.detach();
 			m_ListenThread = std::thread(&Server::ListenerThread, this);
 		}
 
@@ -187,13 +188,14 @@ namespace PURRNET_NS {
 
 		inline void MessageAll(std::string message, PURRNET_NS::Socket *socket) {
 			for (const auto& pair : m_Clients) {
-				if (pair.first != socket) pair.first->Send(message.data());
+				if (pair.first && pair.first != socket) pair.first->Send(message.data());
 			}
 		}
 
 	protected:
 
 		bool m_Running = true;
+		std::mutex m_Mutex;
 
 		inline void DeleteClient(PURRNET_NS::Socket *socket) {
 			m_SocketToDelete = socket;
@@ -201,24 +203,44 @@ namespace PURRNET_NS {
 
 	private:
 
-		inline void ListenerThread() {
+		void ListenerThread() {
 			while (m_Running) {
 				try {
 					auto socket = m_Socket->AcceptSocket();
-					m_Clients[socket] = std::thread(&PURRNET_NS::Server::ClientThread, this, socket);
-				} catch (std::exception ex) {
+					if (socket != nullptr) {
+						std::lock_guard<std::mutex> lock(m_Mutex);
+						m_Clients[socket] = std::thread(&Server::ClientThread, this, socket);
+					}
+				}
+				catch (const std::exception& ex) {
 					PURRNET_LOG_ERR(ex.what());
 					m_Running = false;
 				}
 			}
 		}
 
-		inline void DeletionThread() {
-			while (1) {
-				if (m_SocketToDelete != nullptr) {
-					if (m_Clients[m_SocketToDelete].joinable()) m_Clients[m_SocketToDelete].join();
-					m_Clients.erase(m_SocketToDelete);
+		void DeletionThread() {
+			while (m_Running) {
+				Socket* socketToDelete = nullptr;
+				{
+					std::lock_guard<std::mutex> lock(m_Mutex);
+					socketToDelete = m_SocketToDelete;
 					m_SocketToDelete = nullptr;
+				}
+
+				if (socketToDelete != nullptr) {
+					{
+						std::lock_guard<std::mutex> lock(m_Mutex);
+						if (m_Clients.find(socketToDelete) != m_Clients.end()) {
+							auto& clientThread = m_Clients[socketToDelete];
+							if (clientThread.joinable()) {
+								clientThread.join();
+							}
+							m_Clients.erase(socketToDelete);
+						}
+					}
+
+					delete socketToDelete;
 				}
 			}
 		}
