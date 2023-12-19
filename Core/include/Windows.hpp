@@ -141,9 +141,8 @@ namespace PURRNET_NS {
 		}
 #endif
 
-		inline WinSocket(SOCKET sock)
-			: Socket(), m_Socket(sock) {
-			
+		inline WinSocket(SOCKET sock, sockaddr_in addr, int addrSize)
+			: Socket(), m_SockInfo(addr), m_SockInfoSize(addrSize), m_Socket(sock) {
 		}
 
 		inline ~WinSocket() {
@@ -160,12 +159,14 @@ namespace PURRNET_NS {
 		}
 
 		inline virtual Socket* AcceptSocket() override {
-			SOCKET sock = accept(m_Socket, NULL, NULL);
+			sockaddr_in addr{};
+			int addrSize = sizeof(addr);
+			SOCKET sock = accept(m_Socket, (struct sockaddr*) &addr, &addrSize);
 			if (sock == INVALID_SOCKET) {
 				throw std::runtime_error(PURRNET_FMT("Failed to accept, error: %d!", WSAGetLastError()));
 			}
 
-			auto socket = new WinSocket(sock);
+			auto socket = new WinSocket(sock, addr, addrSize);
 			return socket;
 		}
 
@@ -179,7 +180,7 @@ namespace PURRNET_NS {
 			else PURRNET_LOG_INF(PURRNET_FMT("Connected to %s:%d!", ip.data(), port));
 		}
 
-		inline virtual void Send(char* data) override {
+		inline virtual void Send(const char* data) override {
 			if (m_Socket == INVALID_SOCKET) throw std::runtime_error("Invalid socket!");
 			int byteCount = SOCKET_ERROR;
 			int dataSize = static_cast<int>(strlen(data) + 1);
@@ -198,11 +199,15 @@ namespace PURRNET_NS {
 				throw PURRNET_NS::ClientDisconnectedException(); // PURRNET_FMT("Failed to recieve data, error: %d!", WSAGetLastError()) - previous error message (got replaced with exception)
 			return (data.size = bytes, data);
 		}
+		
+		inline virtual std::string GetIpAddress() const override {
+			return std::string(inet_ntoa(m_SockInfo.sin_addr)) + ":" + std::to_string(m_SockInfo.sin_port);
+		}
 
 	private:
-
+		sockaddr_in m_SockInfo{};
+		int m_SockInfoSize = 0;
 		SOCKET m_Socket = INVALID_SOCKET;
-
 	};
 
 }

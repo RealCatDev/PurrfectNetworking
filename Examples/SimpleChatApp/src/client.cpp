@@ -29,6 +29,10 @@ public:
             std::cout << "Welcome to SimpleChatApp v0.1 example." << std::endl;
             std::cout << "\ttype \"!disconnect\" to disconnect" << std::endl;
             std::cout << "\tby: RealCatDev" << std::endl << std::endl << std::endl << std::endl;
+            m_ReadyForChat = true;
+
+            for (auto& msg : m_Messages) std::cout << msg << std::endl;
+            m_Messages.clear();
         }
         
         while (m_Running) {
@@ -48,12 +52,15 @@ private:
         PURRNET_LOG_INF(PURRNET_FMT("Assigned id: %llu", m_Id));
         while (m_Running) {
             auto msg = Read();
-            std::cout << msg << std::endl;
+            if (!m_ReadyForChat) m_Messages.push_back(msg);
+            else std::cout << msg << std::endl;
         }
     }
 
     std::thread m_ReadThread{};
     uint32_t m_Id = -1;
+    bool m_ReadyForChat = false;
+    std::vector<std::string> m_Messages{};
 
 };
 

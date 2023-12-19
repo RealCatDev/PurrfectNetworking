@@ -10,6 +10,10 @@ struct User {
     std::string name;
     PURRNET_NS::Socket *socket;
 
+    User(std::string n, PURRNET_NS::Socket* sock)
+        : name(n), socket(sock) {
+    }
+
 };
 
 class ExampleServer : public PURRNET_NS::Server {
@@ -24,75 +28,39 @@ public:
 
     }
 
-private:
+    void InitializeEvents() {
+        on("onConnected", [this](PURRNET_NS::Socket *socket, std::string msg) {
+            m_IpToID[msg] = m_IdCounter;
+            socket->Send(std::to_string(m_IdCounter++).c_str());
+            PURRNET_LOG_INF(PURRNET_FMT("[%s] Connected!", msg.c_str()));
+        });
 
-    virtual void ClientThread(PURRNET_NS::Socket *sock) override {
-        char buf[PURRNET_MAXBUF] = {0};
-        int bytesRead = 0;
-        int id = m_IdCounter++;
+        on("onMessage", [this](PURRNET_NS::Socket* socket, std::string data) {
+            size_t pipe = data.find('|');
+            std::string ip = data;
+            ip = ip.erase(pipe);
+            std::string msg = data;
+            msg = msg.erase(0, pipe+1);
+            auto user = m_Users[m_IpToID[ip]];
+            if (!user) {
+                user = m_Users[m_IpToID[ip]] = new User(msg, socket);
+                MessageAll("[" + user->name + " has joined the chat.]");
+            } else MessageAll(user->name + ": " + msg, socket);
+        });
 
-        PURRNET_LOG_INF(PURRNET_FMT("Client connected! Assigned id: %llu.", id));
-        sock->Send((std::to_string(id)).data());
-
-        {
-            PURRNET_NS::RecieveData data;
-            try {
-                data = sock->Recieve();
-            } catch (PURRNET_NS::ClientDisconnectedException ex) {
-                PURRNET_LOG_INF(PURRNET_FMT("Client disconnected! ID: %llu.", id));
-                return;
-            } catch (std::exception ex) {
-                PURRNET_LOG_ERR(ex.what());
-                Stop();
-            }
-            if (sock == nullptr) goto disconnect;
-            User user{};
-            user.name = data.buffer;
-            user.socket = sock;
-            m_Users[id] = user;
-
-            std::ostringstream message{};
-            message << m_Users[id].name;
-            message << " joined!";
-            MessageAll(message.str(), sock);
-        }
-
-        while (m_Running && sock != nullptr) {
-            try {
-                auto data = sock->Recieve();
-                if (data.size <= 0 || strcmp(data.buffer, "!disconnect") == 0) {
-                    break;
-                } else {
-                    std::ostringstream message{};
-                    message << m_Users[id].name;
-                    message << ": ";
-                    message << std::string(data.buffer);
-                    PURRNET_LOG_INF(message.str());
-                    MessageAll(message.str(), sock);
-                }
-            } catch (PURRNET_NS::ClientDisconnectedException ex) {
-                break;
-            } catch (std::exception ex) {
-                PURRNET_LOG_ERR(ex.what());
-                break;
-                m_Running = false;
-            }
-        }
-
-    disconnect:
-        PURRNET_LOG_INF(PURRNET_FMT("Client disconnected! ID: %llu.", id));
-
-        std::ostringstream message{};
-        message << m_Users[id].name;
-        message << " has disconnected!";
-        MessageAll(message.str(), sock);
-
-        m_Users.erase(id);
-        DeleteClient(sock);
+        on("onDisconnected", [this](PURRNET_NS::Socket* socket, std::string data) {
+            PURRNET_LOG_INF(PURRNET_FMT("[%s] Disconnected!", data.c_str()));
+            if (m_Users.find(m_IpToID[data]) != m_Users.end()) MessageAll("[\"" + m_Users[m_IpToID[data]]->name + "\" has disconnected.]", socket);
+            if (m_Users.find(m_IpToID[data]) != m_Users.end()) m_Users.erase(m_IpToID[data]);
+            m_IpToID.erase(data);
+        });
     }
 
+private:
+
     uint32_t m_IdCounter = 1;
-    std::unordered_map<int, User> m_Users{};
+    std::unordered_map<std::string, int> m_IpToID{};
+    std::unordered_map<int, User*> m_Users{};
 
 };
 

@@ -6,9 +6,11 @@
 // Currenly supporting Windows only
 #include "Windows.hpp"
 
+#include "Events.hpp"
+
 namespace PURRNET_NS {
 
-	class Client {
+	class Client : public Events::EventListener {
 
 	public:
 
@@ -82,7 +84,7 @@ namespace PURRNET_NS {
 
 		template <typename T>
 		inline void Send(T* msg) {
-			m_Socket->Send((char*)msg);
+			m_Socket->Send((const char*)msg);
 		}
 
 		inline std::string Read() {
@@ -107,7 +109,7 @@ namespace PURRNET_NS {
 
 	};
 
-	class Server {
+	class Server : public Events::EventListener {
 
 	public:
 
@@ -166,6 +168,7 @@ namespace PURRNET_NS {
 		}
 
 		inline void Run() {
+			InitializeEvents();
 			m_Socket->Listen();
 			m_DeletionThread = std::thread(&Server::DeletionThread, this);
 			m_DeletionThread.detach();
@@ -200,6 +203,8 @@ namespace PURRNET_NS {
 		inline void DeleteClient(PURRNET_NS::Socket *socket) {
 			m_SocketToDelete = socket;
 		}
+
+		virtual void InitializeEvents() {}
 
 	private:
 
@@ -245,7 +250,30 @@ namespace PURRNET_NS {
 			}
 		}
 
-		virtual void ClientThread(PURRNET_NS::Socket *socket) = 0;
+		void ClientThread(PURRNET_NS::Socket* socket) {
+			char buf[PURRNET_MAXBUF] = { 0 };
+			int bytesRead = 0;
+			std::string ip = socket->GetIpAddress();
+
+			emit("onConnected", socket, ip);
+
+			while (m_Running && socket != nullptr) {
+				try {
+					auto data = socket->Recieve();
+
+					emit("onMessage", socket, ip + "|" + data.buffer);
+				} catch (PURRNET_NS::ClientDisconnectedException ex) {
+					break;
+				} catch (std::exception ex) {
+					PURRNET_LOG_ERR(ex.what());
+					break;
+					m_Running = false;
+				}
+			}
+
+			emit("onDisconnected", socket, ip);
+			DeleteClient(socket);
+		}
 
 		std::thread m_ListenThread{};
 		std::thread m_DeletionThread{};

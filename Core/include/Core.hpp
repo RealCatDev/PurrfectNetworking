@@ -109,8 +109,10 @@ namespace PURRNET_NS {
 		
 		virtual void Connect(std::string ip, int port) = 0;
 
-		virtual void Send(char *data) = 0;
+		virtual void Send(const char *data) = 0;
 		virtual RecieveData Recieve() = 0;
+
+		virtual std::string GetIpAddress() const = 0;
 
 	private:
 
