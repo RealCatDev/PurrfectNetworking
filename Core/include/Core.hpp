@@ -43,6 +43,7 @@
 #ifndef PURRNET_FMT
 #include <cstdio>
 #include <cstdarg>
+#include <functional>
 
 const char* PURRNET_FMT(const char* fmt, ...) {
 	char* buffer = (char*)malloc(PURRNET_MAXBUF);
@@ -59,23 +60,49 @@ const char* PURRNET_FMT(const char* fmt, ...) {
 namespace PURRNET_NS {
 
 	class ClientDisconnectedException : public std::exception {
-
 	public:
-
-		inline ClientDisconnectedException()
-		{
-		}
-
-		inline ~ClientDisconnectedException() {
-
-		}
-
+		inline ClientDisconnectedException() {}
+		inline ~ClientDisconnectedException() {}
 	private:
-
 	};
 
+	class Socket;
+
+	namespace Events {
+
+		class EventListener {
+		public:
+			using EventCallback = std::function<void(PURRNET_NS::Socket*, std::string)>;
+
+			void on(const std::string& eventName, const EventCallback& callback) {
+				if (!m_Events[eventName]) m_Events[eventName] = (callback);
+			}
+
+			void once(const std::string& eventName, const EventCallback& callback) {
+				auto onceWrapper = [this, eventName, callback](Socket* sock, std::string data) {
+					callback(sock, data);
+					off(eventName, callback);
+					};
+
+				on(eventName, onceWrapper);
+			}
+
+			void off(const std::string& eventName, const EventCallback& callback) {
+				if (m_Events[eventName]) m_Events[eventName] = nullptr;
+			}
+
+			virtual void emit(const std::string& eventName, Socket* sock, std::string data) {
+				if (m_Events[eventName]) m_Events[eventName](sock, data);
+			}
+
+		private:
+			std::unordered_map<std::string, EventCallback> m_Events;
+		};
+
+	}
+
 	struct RecieveData {
-		char buffer[PURRNET_MAXBUF] = "";
+		char buffer[PURRNET_MAXBUF] = { 0 };
 		size_t size = 0;
 	};
 
@@ -84,7 +111,7 @@ namespace PURRNET_NS {
 	// Used to convert hostname to ip
 	static std::string hostname(std::string hostname); 
 
-	class Socket {
+	class Socket : public Events::EventListener {
 
 	public:
 

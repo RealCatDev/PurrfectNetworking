@@ -6,8 +6,6 @@
 // Currenly supporting Windows only
 #include "Windows.hpp"
 
-#include "Events.hpp"
-
 namespace PURRNET_NS {
 
 	class Client : public Events::EventListener {
@@ -101,6 +99,14 @@ namespace PURRNET_NS {
 		}
 
 		inline void Stop() { m_Running = false; }
+
+	private:
+
+		void ListenerThread() {
+			while (m_Running) {
+				
+			}
+		}
 
 	protected:
 
