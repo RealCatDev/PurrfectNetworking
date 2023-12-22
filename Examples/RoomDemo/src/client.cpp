@@ -15,50 +15,19 @@ public:
 
     }
 
-    virtual void Run() override {
-        m_ReadThread = std::thread(&ExampleClient::ReadThread, this);
-        while (m_Id == -1) {}
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
-        {
-            std::cout << "What is your username? > ";
-            std::string input = "";
-            std::getline(std::cin, input);
-            m_Socket->Send(input.data());
-            system("cls");
-            std::cout << "Welcome to SimpleChatApp v0.1 example." << std::endl;
-            std::cout << "\ttype \"!disconnect\" to disconnect" << std::endl;
-            std::cout << "\tby: RealCatDev" << std::endl << std::endl << std::endl << std::endl;
-            m_ReadyForChat = true;
-
-            for (auto& msg : m_Messages) std::cout << msg << std::endl;
-            m_Messages.clear();
-        }
-        
-        while (m_Running) {
-            std::string input = "";
-            std::getline(std::cin, input);
-            m_Socket->Send(input.data());
-            if (input == "!disconnect") m_Running = false;
-        }
-
-        if (m_ReadThread.joinable()) m_ReadThread.join();
+    virtual void InitializeEvents() override {
+        on("onMessage", [this](PURRNET_NS::Socket* socket, std::string data) {
+            if (m_Id < 0) {
+                m_Id = atoi(data.c_str());
+            } else {
+                std::cout << data << std::endl;
+            }
+        });
     }
 
 private:
 
-    void ReadThread() {
-        m_Id = atoi(Read().data());
-        PURRNET_LOG_INF(PURRNET_FMT("Assigned id: %llu", m_Id));
-        while (m_Running) {
-            auto msg = Read();
-            if (!m_ReadyForChat) m_Messages.push_back(msg);
-            else std::cout << msg << std::endl;
-        }
-    }
-
-    std::thread m_ReadThread{};
-    uint32_t m_Id = -1;
+    int m_Id = -1;
     bool m_ReadyForChat = false;
     std::vector<std::string> m_Messages{};
 
@@ -71,11 +40,10 @@ int main(int argc, char** argv) {
     std::string input = "";
     bool running = true;
 
-    try {
-        client = new ExampleClient();
-        client->Run();
-    } catch (std::exception ex) {
-        PURRNET_LOG_ERR(ex.what());
+    client = new ExampleClient();
+    client->Run();
+    while (client->Running()) {
+        
     }
 
     if (client) delete client;

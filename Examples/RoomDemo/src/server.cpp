@@ -6,92 +6,19 @@
 #include <sstream>
 
 struct User {
-    std::string name, ip;
     PURRNET_NS::Socket* socket;
-    uint32_t ID, roomId;
-
-    User() = default;
-
-    User(uint32_t id, std::string ip, PURRNET_NS::Socket* sock)
-        : name(""), ip(ip), socket(sock), ID(id), roomId(-1) {
-    }
+    std::string name, ip;
+    int id, roomId;
 };
 
 struct Room{
-    uint32_t ID;
-    uint32_t OwnerID;
+    int ID;
 
     Room() = default;
 
-    Room(uint32_t id, User owner)
-        : ID(id), OwnerID(owner.ID) {
+    Room(int id)
+        : ID(id) {
     }
-};
-
-class Store {
-
-public:
-
-    Store() = default;
-    ~Store() = default;
-
-    inline User& RegisterUser(PURRNET_NS::Socket *sock) {
-        m_Users[m_Users.size()] = User(m_Users.size(), sock->GetIpAddress(), sock);
-        return m_Users[m_Users.size() - 1];
-    }
-
-    inline Room& RegisterRoom(User owner) {
-        m_Rooms[m_Rooms.size()] = Room(m_Rooms.size(), owner);
-        return m_Rooms[m_Rooms.size() - 1];
-    }
-
-    inline User &GetUserByIP(std::string ip) {
-        auto it = std::find(m_Users.begin(), m_Users.end(), [ip](User* u) { return u->ip == ip; });
-        if (it == m_Users.end()) return (User&)User();
-        return (*it).second;
-    }
-
-    inline std::unordered_map<uint32_t, User>::iterator GetUserItByIP(std::string ip) {
-        auto it = std::find(m_Users.begin(), m_Users.end(), [ip](User* u) { return u->ip == ip; });
-        if (it == m_Users.end()) return {};
-        return it;
-    }
-
-    inline void RemoveIP(std::string ip) {
-        m_Users.erase(GetUserItByIP(ip));
-    }
-
-    inline Room& GetRoom(uint32_t id) {
-        return m_Rooms[id];
-    }
-
-    inline std::unordered_map<uint32_t, Room>::iterator GetRoomIt(uint32_t id) {
-        return std::find(m_Rooms.begin(), m_Rooms.end(), [id](Room* r) { return id == r->ID; });
-    }
-
-    inline Room& GetRoomByOwner(User owner) {
-        auto it = std::find(m_Rooms.begin(), m_Rooms.end(), [owner](Room* r) { return r->OwnerID == owner.ID; });
-        if (it == m_Rooms.end()) return (Room&)Room();
-        return (*it).second;
-    }
-
-    inline std::unordered_map<uint32_t, Room>::iterator GetRoomItByOwner(User owner) {
-        return std::find(m_Rooms.begin(), m_Rooms.end(), [owner](Room* r) { return owner.ID == r->OwnerID; });
-    }
-
-    inline void RemoveRoom(uint32_t id) {
-        m_Rooms.erase(GetRoomIt(id));
-    }
-
-    inline void RemoveRoomByOwner(User owner) {
-        m_Rooms.erase(GetRoomItByOwner(owner));
-    }
-
-private:
-
-    std::unordered_map<uint32_t, User> m_Users;
-    std::unordered_map<uint32_t, Room> m_Rooms;
-
 };
 
 class ExampleServer : public PURRNET_NS::Server {
@@ -99,7 +26,7 @@ class ExampleServer : public PURRNET_NS::Server {
 public:
 
     ExampleServer() 
-        : PURRNET_NS::Server(), m_Store(std::make_unique<Store>()) {
+        : PURRNET_NS::Server() {
     }
 
     ~ExampleServer() {
@@ -108,7 +35,11 @@ public:
 
     void InitializeEvents() {
         on("onConnected", [this](PURRNET_NS::Socket *socket, std::string msg) {
-            socket->Send(std::to_string(m_Store->RegisterUser(socket).ID).c_str());
+            auto user = CreateUser(socket);
+            auto idStr = std::to_string(user.id);
+            const char *id = idStr.c_str();
+            socket->Send("meow");
+            std::cout << id << ":" << strlen(id) << std::endl;
             PURRNET_LOG_INF(PURRNET_FMT("[%s] Connected!", msg.c_str()));
         });
 
@@ -121,7 +52,7 @@ public:
                 msg = data;
                 msg = msg.erase(0, pipe+1);
             }
-            auto user = m_Store->GetUserByIP(ip);
+            auto user = GetUserByIP(ip);
             if (user.name.empty()) {
                 user.name = msg;
             } else {
@@ -131,23 +62,48 @@ public:
                     room.erase(space);
                     uint32_t roomId = static_cast<uint32_t>(atoi(room.c_str()));
                 } else if (msg == ":createRoom") {
-                    auto room = m_Store->RegisterRoom(user);
-                    socket->emit("joinRoom", std::to_string(room.ID));
+                    auto room = CreateRoom();
+                    socket->emit("joinRoom", socket, std::to_string(room.ID));
                 } else MessageAll(user.name + ": " + msg, socket);
             }
         });
 
         on("onDisconnected", [this](PURRNET_NS::Socket* socket, std::string data) {
             PURRNET_LOG_INF(PURRNET_FMT("[%s] Disconnected!", data.c_str()));
-
-            m_Store->RemoveIP(data);
         });
     }
 
 private:
 
-    std::unique_ptr<Store> m_Store;
+    User &CreateUser(PURRNET_NS::Socket* sock) {
+        int id = m_IpToID.size();
+        m_IpToID[sock->GetIpAddress()] = id;
+        auto usr = User();
+        usr.id = id;
+        usr.ip = sock->GetIpAddress();
+        usr.socket = sock;
+        if (m_Users.size() <= id) m_Users.resize(id+1);
+        m_Users[id] = usr;
+        return m_Users[id];
+    }
+
+    User &GetUserByIP(std::string ip) {
+        auto id = m_IpToID[ip];
+        return m_Users[id];
+    }
+
+    Room& CreateRoom() {
+        Room room{};
+        int id = m_Rooms.size();
+        room.ID = id;
+        if (m_Rooms.size() < id) m_Users.resize(id);
+        m_Rooms[id] = room;
+        return m_Rooms[id];
+    }
+
     std::unordered_map<std::string, int> m_IpToID{};
+    std::vector<User> m_Users{};
+    std::vector<Room> m_Rooms{};
 
 };
 

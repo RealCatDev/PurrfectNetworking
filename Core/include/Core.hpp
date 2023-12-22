@@ -92,7 +92,11 @@ namespace PURRNET_NS {
 			}
 
 			virtual void emit(const std::string& eventName, Socket* sock, std::string data) {
-				if (m_Events[eventName]) m_Events[eventName](sock, data);
+				try {
+					if (m_Events[eventName]) m_Events[eventName](sock, data);
+				} catch (std::runtime_error err) {
+					
+				}
 			}
 
 		private:

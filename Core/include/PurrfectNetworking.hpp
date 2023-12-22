@@ -70,8 +70,9 @@ namespace PURRNET_NS {
 			delete m_Socket;
 		}
 
-		inline virtual void Run() {
-
+		inline void Run() {
+			InitializeEvents();
+			m_ListenerThread = std::thread(&Client::ListenerThread, this);
 		}
 
 		inline bool Running() { return m_Running; }
@@ -100,18 +101,42 @@ namespace PURRNET_NS {
 
 		inline void Stop() { m_Running = false; }
 
-	private:
+	protected:
 
-		void ListenerThread() {
-			while (m_Running) {
-				
-			}
+		virtual void InitializeEvents() {
+
 		}
 
-	protected:
+		inline void ListenerThread() {
+			char buf[PURRNET_MAXBUF] = { 0 };
+			int bytesRead = 0;
+			std::string ip = m_Socket->GetIpAddress();
+
+			emit("onConnected", m_Socket, ip);
+
+			while (m_Running && m_Socket != nullptr) {
+				try {
+					auto data = m_Socket->Recieve();
+
+					emit("onMessage", m_Socket, std::string("") + data.buffer);
+				} catch (PURRNET_NS::ClientDisconnectedException& ex) {
+					break;
+				} catch (std::exception& ex) {
+					PURRNET_LOG_ERR(ex.what());
+					m_Running = false;
+					break;
+				}
+			}
+
+			emit("onDisconnected", m_Socket, ip);
+		}
 
 		bool m_Running = true;
 		Socket* m_Socket = nullptr;
+
+	private:
+
+		std::thread m_ListenerThread{};
 
 	};
 
