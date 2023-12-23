@@ -92,11 +92,7 @@ namespace PURRNET_NS {
 			}
 
 			virtual void emit(const std::string& eventName, Socket* sock, std::string data) {
-				try {
-					if (m_Events[eventName]) m_Events[eventName](sock, data);
-				} catch (std::runtime_error err) {
-					
-				}
+				if (m_Events[eventName]) m_Events[eventName](sock, data);
 			}
 
 		private:
@@ -137,13 +133,25 @@ namespace PURRNET_NS {
 
 		virtual void Listen() = 0;
 		virtual Socket *AcceptSocket() = 0;
-		
 		virtual void Connect(std::string ip, int port) = 0;
 
-		virtual void Send(const char *data) = 0;
+		virtual void Send(const char* data) = 0;
+		
+		inline void SendMsg(const char* data) {
+			std::string msg = "msg " + std::string(data);
+
+			Send(msg.c_str());
+		}
+
 		virtual RecieveData Recieve() = 0;
 
 		virtual std::string GetIpAddress() const = 0;
+
+		virtual void emit(const std::string& eventName, Socket* sock, std::string data) {
+			std::string eventData = "evt " + eventName + " " + data;
+
+			Send(eventData.c_str());
+		}
 
 	private:
 

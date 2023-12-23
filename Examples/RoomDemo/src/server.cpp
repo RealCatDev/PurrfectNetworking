@@ -19,6 +19,10 @@ struct Room{
     Room(int id)
         : ID(id) {
     }
+
+    bool operator ==(Room& other) {
+        return ID == other.ID;
+    }
 };
 
 class ExampleServer : public PURRNET_NS::Server {
@@ -38,8 +42,7 @@ public:
             auto user = CreateUser(socket);
             auto idStr = std::to_string(user.id);
             const char *id = idStr.c_str();
-            socket->Send("meow");
-            std::cout << id << ":" << strlen(id) << std::endl;
+            socket->SendMsg(id);
             PURRNET_LOG_INF(PURRNET_FMT("[%s] Connected!", msg.c_str()));
         });
 
@@ -54,16 +57,25 @@ public:
             }
             auto user = GetUserByIP(ip);
             if (user.name.empty()) {
-                user.name = msg;
+                SetUsersName(ip, msg);
             } else {
-                if (msg.starts_with(":join")) {
+                std::cout << msg << std::endl;
+                if (msg == ":disconnect") {
+                    emit("onDisconnected", socket, ip);
+                } else if (msg.starts_with(":join")) {
                     size_t space = msg.find(' ');
+                    if (space > msg.size()) { socket->SendMsg("Invalid :join syntax! Valid: \":join <roomId>\""); return; }
                     std::string room = msg;
-                    room.erase(space);
-                    uint32_t roomId = static_cast<uint32_t>(atoi(room.c_str()));
+                    room.erase(0, space+1);
+                    int roomId = atoi(room.c_str());
+                    std::cout << room << std::endl;
+                    if (!RoomExists(roomId)) socket->SendMsg("Room with that ID doesn't exist!");
+                    else JoinRoom(ip, roomId, socket);
                 } else if (msg == ":createRoom") {
                     auto room = CreateRoom();
-                    socket->emit("joinRoom", socket, std::to_string(room.ID));
+                    JoinRoom(ip, room.ID, socket);
+                    std::string msg = std::string("Created room with id: ") + std::to_string(room.ID);
+                    socket->SendMsg(msg.c_str());
                 } else MessageAll(user.name + ": " + msg, socket);
             }
         });
@@ -76,7 +88,7 @@ public:
 private:
 
     User &CreateUser(PURRNET_NS::Socket* sock) {
-        int id = m_IpToID.size();
+        int id = static_cast<int>(m_IpToID.size());
         m_IpToID[sock->GetIpAddress()] = id;
         auto usr = User();
         usr.id = id;
@@ -92,18 +104,43 @@ private:
         return m_Users[id];
     }
 
+    void JoinRoom(std::string ip, int roomId, PURRNET_NS::Socket *socket) {
+        auto id = m_IpToID[ip];
+        socket->emit("joinRoom", socket, std::to_string(roomId));
+        m_Users[id].roomId = roomId;
+    }
+
+    void SetUsersName(std::string ip, std::string name) {
+        auto id = m_IpToID[ip];
+
+        m_Users[id].name = name;
+    }
+
     Room& CreateRoom() {
         Room room{};
-        int id = m_Rooms.size();
+        int id = static_cast<int>(m_Rooms.size());
         room.ID = id;
-        if (m_Rooms.size() < id) m_Users.resize(id);
+        if (m_Rooms.size() <= id) m_Rooms.resize(id+1);
         m_Rooms[id] = room;
+        m_RoomExistanceTable[id] = true;
         return m_Rooms[id];
+    }
+
+    Room &GetRoom(int id) {
+        if (m_Rooms.size() < id) return (Room&)Room();
+        return m_Rooms[id];
+    }
+
+    bool RoomExists(int id) {
+        if (m_RoomExistanceTable.find(id) == m_RoomExistanceTable.end()) m_RoomExistanceTable[id] = false;
+
+        return m_RoomExistanceTable[id];
     }
 
     std::unordered_map<std::string, int> m_IpToID{};
     std::vector<User> m_Users{};
     std::vector<Room> m_Rooms{};
+    std::unordered_map<int, bool> m_RoomExistanceTable{};
 
 };
 

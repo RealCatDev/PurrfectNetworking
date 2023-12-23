@@ -6,6 +6,8 @@
 // Currenly supporting Windows only
 #include "Windows.hpp"
 
+#include <sstream>
+
 namespace PURRNET_NS {
 
 	class Client : public Events::EventListener {
@@ -117,8 +119,16 @@ namespace PURRNET_NS {
 			while (m_Running && m_Socket != nullptr) {
 				try {
 					auto data = m_Socket->Recieve();
+					auto input = std::string(data.buffer);
+					if (input.find("evt") == 0) {
+						std::string name, data;
+						if (!parseEventString(input, name, data)) { Send("Invalid event string!"); }
+						emit(name, m_Socket, data);
+					} else {
+						std::string msg = input.erase(0, input.find(' ')+1);
 
-					emit("onMessage", m_Socket, std::string("") + data.buffer);
+						emit("onMessage", m_Socket, msg);
+					}
 				} catch (PURRNET_NS::ClientDisconnectedException& ex) {
 					break;
 				} catch (std::exception& ex) {
@@ -135,6 +145,16 @@ namespace PURRNET_NS {
 		Socket* m_Socket = nullptr;
 
 	private:
+
+		bool parseEventString(const std::string& input, std::string &eventName, std::string &eventData) {
+			std::istringstream iss(input);
+			std::string command;
+			if (!(iss >> command) || command != "evt") return false;
+			if (!(iss >> eventName) || !(std::getline(iss, eventData))) return false;
+			eventData = eventData.substr(eventData.find_first_not_of(" \t"));
+			
+			return true;
+		}
 
 		std::thread m_ListenerThread{};
 
@@ -216,13 +236,13 @@ namespace PURRNET_NS {
 
 		inline void MessageAll(std::string message) {
 			for (const auto& pair : m_Clients) {
-				pair.first->Send(message.data());
+				pair.first->SendMsg(message.data());
 			}
 		}
 
 		inline void MessageAll(std::string message, PURRNET_NS::Socket *socket) {
 			for (const auto& pair : m_Clients) {
-				if (pair.first && pair.first != socket) pair.first->Send(message.data());
+				if (pair.first && pair.first != socket) pair.first->SendMsg(message.data());
 			}
 		}
 
