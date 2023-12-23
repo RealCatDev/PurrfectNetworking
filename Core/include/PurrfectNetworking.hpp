@@ -246,6 +246,12 @@ namespace PURRNET_NS {
 			}
 		}
 
+		inline void MessageIf(std::string message, std::function<bool(PURRNET_NS::Socket*)> func) {
+			for (const auto& pair : m_Clients) {
+				if (func(pair.first)) pair.first->SendMsg(message.data());
+			}
+		}
+
 	protected:
 
 		bool m_Running = true;

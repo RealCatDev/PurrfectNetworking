@@ -59,7 +59,6 @@ public:
             if (user.name.empty()) {
                 SetUsersName(ip, msg);
             } else {
-                std::cout << msg << std::endl;
                 if (msg == ":disconnect") {
                     emit("onDisconnected", socket, ip);
                 } else if (msg.starts_with(":join")) {
@@ -76,7 +75,12 @@ public:
                     JoinRoom(ip, room.ID, socket);
                     std::string msg = std::string("Created room with id: ") + std::to_string(room.ID);
                     socket->SendMsg(msg.c_str());
-                } else MessageAll(user.name + ": " + msg, socket);
+                } else
+                    MessageIf(user.name + ": " + msg, [this, user, socket](PURRNET_NS::Socket* sock) {
+                        if (sock->GetIpAddress() == socket->GetIpAddress()) return false;
+                        auto u = GetUserByIP(sock->GetIpAddress());
+                        return user.roomId == -1 || u.roomId == user.roomId;
+                    });
             }
         });
 
@@ -94,8 +98,10 @@ private:
         usr.id = id;
         usr.ip = sock->GetIpAddress();
         usr.socket = sock;
+        usr.roomId = -1;
         if (m_Users.size() <= id) m_Users.resize(id+1);
         m_Users[id] = usr;
+        m_UserToRoomMap[id] = -1;
         return m_Users[id];
     }
 
@@ -104,10 +110,12 @@ private:
         return m_Users[id];
     }
 
+    // if roomId = -1 leave
     void JoinRoom(std::string ip, int roomId, PURRNET_NS::Socket *socket) {
         auto id = m_IpToID[ip];
         socket->emit("joinRoom", socket, std::to_string(roomId));
         m_Users[id].roomId = roomId;
+        m_UserToRoomMap[id] = roomId;
     }
 
     void SetUsersName(std::string ip, std::string name) {
@@ -132,12 +140,13 @@ private:
     }
 
     bool RoomExists(int id) {
+        if (id == -1) return true;
         if (m_RoomExistanceTable.find(id) == m_RoomExistanceTable.end()) m_RoomExistanceTable[id] = false;
-
         return m_RoomExistanceTable[id];
     }
 
     std::unordered_map<std::string, int> m_IpToID{};
+    std::unordered_map<int, int> m_UserToRoomMap{};
     std::vector<User> m_Users{};
     std::vector<Room> m_Rooms{};
     std::unordered_map<int, bool> m_RoomExistanceTable{};
